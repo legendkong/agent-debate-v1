@@ -5,6 +5,7 @@ import { loadQAStuffChain } from 'langchain/chains'
 import { Document } from 'langchain/document'
 import { timeout } from './config'
 
+// transform documents into vectors and storing in Pinecone
 export const createPineconeIndex = async (
   client,
   indexName,

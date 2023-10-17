@@ -5,7 +5,8 @@ import { loadQAStuffChain } from 'langchain/chains'
 import { Document } from 'langchain/document'
 import { timeout } from './config'
 
-// transform documents into vectors and storing in Pinecone
+// this file allows transformation of documents into vectors and storing in Pinecone
+// call this function to create pinecone index
 export const createPineconeIndex = async (
   client,
   indexName,
@@ -37,6 +38,7 @@ export const createPineconeIndex = async (
   }
 }
 
+// call this function to upload data to pinecone
 export const updatePinecone = async (client, indexName, docs) => {
   // 1. Retrieve Pinecone index
   const index = client.Index(indexName)
@@ -93,5 +95,50 @@ export const updatePinecone = async (client, indexName, docs) => {
         batch = []
       }
     }
+  }
+}
+
+export const queryPineconeVectorStoreAndQueryLLM = async (
+  client,
+  indexName,
+  question
+) => {
+  // 1. Start query process
+  console.log('Querying Pinecone vector store...')
+  // 2. Retrieve the Pinecone index
+  const index = client.Index(indexName)
+  // 3. Query the index
+  const queryEmbedding = await new OpenAIEmbeddings().embedQuery(question)
+  // 4.Query Pinecone index and return top 10 matches
+  let queryResponse = await index.query({
+    queryRequest: {
+      topK: 10,
+      vector: queryEmbedding,
+      includeMetadata: true,
+      includeValues: true
+    }
+  })
+  // 5. Log the number of matches
+  console.log(`Found ${queryResponse.matches.length} matches...`)
+  // 6. Log the questions being asked
+  console.log(`Asking question: ${question}...`)
+  if (queryResponse.matches.length) {
+    // 7. Create an OpenAI instance and load the QAStuffChain
+    const llm = new OpenAI({})
+    const chain = loadQAStuffChain(llm)
+    // 8. Extract and concatenate page content from matched documents
+    const concatenatedPageContent = queryResponse.matches
+      .map((match) => match.metadata.pageContent)
+      .join(' ')
+    const result = await chain.call({
+      input_documents: [new Document({ pageContent: concatenatedPageContent })],
+      question: question
+    })
+    // 10. Log the answer
+    console.log(`Answer: ${result.text}`)
+    return result.text
+  } else {
+    // 11. Log that there are no matches, so GPT-3 will not be called
+    console.log('Since there are no matches, GPT-3 will not be queried.')
   }
 }

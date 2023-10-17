@@ -39,6 +39,22 @@ export default function Home() {
 
   return (
     // min-h-screen missing (to add in in the future)
-    <main className='flex flex-col items-center justify-between p-24'></main>
+    <main className='flex flex-col items-center justify-between p-24'>
+      <input
+        className='text-black px-2 py-1'
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <button
+        className='px-7 py-1 rounded-2xl bg-white text-black mt-2 mb-2'
+        onClick={sendQuery}
+      >
+        Ask AI
+      </button>
+      {loading && <p>Asking AI ...</p>}
+      {result && <p>{result}</p>}
+      <button onClick={createIndexAndEmbeddings}>
+        Create Index and embeddings
+      </button>
+    </main>
   )
 }

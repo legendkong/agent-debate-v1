@@ -8,25 +8,23 @@ import { timeout } from './config'
 // this file allows transformation of documents into vectors and storing in Pinecone
 // call this function to create pinecone index
 export const createPineconeIndex = async (
-  client,
+  pinecone,
   indexName,
   vectorDimension
 ) => {
   // 1. Initiate index existence check
   console.log(`Checking "${indexName}"...`)
   // 2. Get list of existing indexes
-  const existingIndexes = await client.listIndexes()
+  const existingIndexes = await pinecone.listIndexes()
   // 3. If index does not exist, create it
   if (!existingIndexes.includes(indexName)) {
     // 4. Log index creation initiation
     console.log(`Creating "${indexName}"...`)
     // 5. Create index
-    await client.createIndex({
-      createRequest: {
-        name: indexName,
-        dimension: vectorDimension,
-        metric: 'cosine'
-      }
+    await pinecone.createIndex({
+      name: indexName,
+      dimension: vectorDimension,
+      metric: 'cosine'
     })
     // 6. Log successful creation
     console.log(`Creating index.... please wait for it to finish initializing.`)
@@ -39,9 +37,9 @@ export const createPineconeIndex = async (
 }
 
 // call this function to upload data to pinecone
-export const updatePinecone = async (client, indexName, docs) => {
+export const updatePinecone = async (pinecone, indexName, docs) => {
   // 1. Retrieve Pinecone index
-  const index = client.Index(indexName)
+  const index = pinecone.index(indexName)
   // 2. Log the the retrieved index name
   console.log(`Pinecone index retrieved: ${indexName}`)
   // 3. Process each document in docs array
@@ -84,39 +82,51 @@ export const updatePinecone = async (client, indexName, docs) => {
         }
       }
       batch = [...batch, vector]
-      // When batch is full or it's he last item, upsert the vectors
+      // // When batch is full or it's he last item, upsert the vectors
+      // if (batch.length === batchSize || idx === chunks.length - 1) {
+      //   await index.upsert({
+      //     upsertRequest: {
+      //       vectors: batch
+      //     }
+      //   })
+      //   // Empty the batch
+      //   batch = []
+      // }
+
+      // When batch is full or it's the last item, upsert the vectors
       if (batch.length === batchSize || idx === chunks.length - 1) {
-        await index.upsert({
-          upsertRequest: {
-            vectors: batch
-          }
-        })
+        // 8. Create an array of upsert objects
+
+        // id: item.id, // assuming each item has an id property
+        // values: item.values // changed 'vector' to 'values'
+
+        await index.upsert(batch)
         // Empty the batch
         batch = []
       }
     }
+    // 8. Log the number of vectors updated
+    console.log(`Pinecone index updated with ${chunks.length} vectors`)
   }
 }
 
 export const queryPineconeVectorStoreAndQueryLLM = async (
-  client,
+  pinecone,
   indexName,
   question
 ) => {
   // 1. Start query process
   console.log('Querying Pinecone vector store...')
   // 2. Retrieve the Pinecone index
-  const index = client.Index(indexName)
+  const index = pinecone.index(indexName)
   // 3. Query the index
   const queryEmbedding = await new OpenAIEmbeddings().embedQuery(question)
   // 4.Query Pinecone index and return top 10 matches
   let queryResponse = await index.query({
-    queryRequest: {
-      topK: 10,
-      vector: queryEmbedding,
-      includeMetadata: true,
-      includeValues: true
-    }
+    topK: 10,
+    vector: queryEmbedding,
+    includeMetadata: true,
+    includeValues: true
   })
   // 5. Log the number of matches
   console.log(`Found ${queryResponse.matches.length} matches...`)
